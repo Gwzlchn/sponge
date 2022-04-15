@@ -76,7 +76,7 @@ bool ByteStream::input_ended() const { return _end; }
 
 size_t ByteStream::buffer_size() const { return _bytes_written - _bytes_read; }
 
-bool ByteStream::buffer_empty() const { return buffer_size()==0; }
+bool ByteStream::buffer_empty() const { return buffer_size() == 0; }
 
 bool ByteStream::eof() const { return _end && buffer_empty(); }
 
