@@ -7,7 +7,44 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
+#include <vector>
 #include <queue>
+
+class RetransTimer {
+  private:
+    uint32_t _remaining_time{0};
+    bool _is_stopped{false};
+    bool _is_expired{false};
+
+  public:
+    RetransTimer() : _remaining_time(0), _is_stopped(true), _is_expired(false) {}
+    RetransTimer(uint32_t init_time, bool stopped, bool expired)
+        : _remaining_time(init_time), _is_stopped(stopped), _is_expired(expired) {}
+    void tick_to_retrans_timer(uint32_t ms_since_last_tick) {
+        if (_is_stopped) {
+            return;
+        }
+        if (ms_since_last_tick >= _remaining_time) {
+            _remaining_time = 0;
+            _is_expired = true;
+        } else {
+            _remaining_time -= ms_since_last_tick;
+        }
+    }
+    bool is_expired() const { return _is_expired; }
+    bool is_stopped() const { return _is_stopped; }
+    void start_new_timer(uint32_t new_rto) {
+        _remaining_time = new_rto;
+        _is_expired = false;
+        _is_stopped = false;
+    }
+
+    void stop_retrans_timer() {
+        _is_stopped = true;
+        _is_expired = false;
+        _remaining_time = 0;
+    }
+};
 
 //! \brief The "sender" part of a TCP implementation.
 
@@ -17,6 +54,24 @@
 //! segments if the retransmission timer expires.
 class TCPSender {
   private:
+    //! Some TCP state flags send to the other side,
+    bool _syn_sent{false};
+    //! When FIN is sent, it means that the data stream is closed on its own side, `fill_window` will return directly
+    bool _fin_sent{false};
+    //! the receive windows size, from the other side
+    uint16_t _win_size{1};
+
+    //! Once the segment is filled the window(using the data payload), it will be sent to the other side
+    //! In this lab `send_segments` means move the segment to `_segments_out` FIFO and `_outstanding_segments` map
+    void send_segment(TCPSegment &seg);
+    //! keep track of segments which have been sent but not yet acked by the receiver
+    //!@{
+    // first-> the absolute sequence number, it will be mono increased
+    // second-> the outstanding tcp segment
+    std::vector<std::pair<size_t, TCPSegment>> _outstanding_segments{};
+    size_t _outstanding_bytes{0};
+    // !@}
+
     //! our initial sequence number, the number for our SYN.
     WrappingInt32 _isn;
 
@@ -25,6 +80,10 @@ class TCPSender {
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
+    RetransTimer _retrans_timer{};
+    //! current retransmission timeout value, aka RTO
+    uint64_t _current_retransmission_timeout{0};
+    unsigned int _consecutive_retransmission_cnt{0};
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
