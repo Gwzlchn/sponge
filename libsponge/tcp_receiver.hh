@@ -14,6 +14,11 @@
 //! the acknowledgment number and window size to advertise back to the
 //! remote TCPSender.
 class TCPReceiver {
+    //! Some TCP Flag received in the first and the last segment from other side
+    bool _syn{false};
+    bool _fin{false};
+    WrappingInt32 _isn{0};
+
     //! Our data structure for re-assembling bytes.
     StreamReassembler _reassembler;
 
