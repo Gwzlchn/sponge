@@ -13,6 +13,7 @@ using namespace std;
 void TCPReceiver::segment_received(const TCPSegment &seg) {
     const auto &hdr = seg.header();
     const auto &data = seg.payload();
+    // Not receive SYN yet
     if (!_syn) {
         if (!hdr.syn) {
             return;
@@ -30,7 +31,7 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     size_t ckpt = stream_out().bytes_written() + 1;
     uint64_t absolute_seqno = unwrap(hdr.seqno, _isn, ckpt);
     // In the first segment, the stream index should be 0, or this index should be absolute seqno minus 1
-    uint64_t stream_idx = absolute_seqno + (hdr.syn) - 1;
+    uint64_t stream_idx = absolute_seqno + static_cast<uint64_t>(hdr.syn) - 1;
     _reassembler.push_substring(data.copy(), stream_idx, _fin);
 }
 
@@ -40,7 +41,7 @@ optional<WrappingInt32> TCPReceiver::ackno() const {
     }
     // written bytes + SYN
     uint64_t absolute_ackno = stream_out().bytes_written() + 1;
-    // Only there is no segment on the fly and receive the FIN flag, then the absolute seq add 1
+    // Only when there is no segment on the fly and receive the FIN flag, then the absolute seq add 1
     absolute_ackno += (_fin && _reassembler.unassembled_bytes() == 0) ? 1 : 0;
     return wrap(absolute_ackno, _isn);
 }
