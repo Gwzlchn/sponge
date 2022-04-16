@@ -2,8 +2,8 @@
 
 #include "tcp_config.hh"
 
-#include <random>
 #include <iostream>
+#include <random>
 // Dummy implementation of a TCP sender
 
 // For Lab 3, please replace with a real implementation that passes the
@@ -122,7 +122,7 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
             _consecutive_retransmission_cnt++;
         }
         if (_consecutive_retransmission_cnt <= TCPConfig::MAX_RETX_ATTEMPTS) {
-          _segments_out.push(iter->second);
+            _segments_out.push(iter->second);
         }
         _retrans_timer.start_new_timer(_current_retransmission_timeout);
     }

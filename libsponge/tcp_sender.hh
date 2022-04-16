@@ -7,8 +7,8 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
-#include <vector>
 #include <queue>
+#include <vector>
 
 class RetransTimer {
   private:
