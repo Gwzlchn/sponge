@@ -5,10 +5,54 @@
 #include "tcp_receiver.hh"
 #include "tcp_sender.hh"
 #include "tcp_state.hh"
+#ifdef DEBUG
+#include <iostream>
+#endif
+template <typename... Targs>
+void DUMMY_CODE(Targs &&... /* unused */) {}
 
 //! \brief A complete endpoint of a TCP connection
 class TCPConnection {
+    class TCPConnectionDebugger {
+      private:
+        bool open_debugger{true};
+
+      public:
+        TCPConnectionDebugger() : open_debugger(true) {}
+        ~TCPConnectionDebugger() {}
+
+        std::string color_1(const std::string &data) { return data; }
+
+        std::string color_2(const std::string &data) { return data; }
+
+        void print_segment(const TCPConnection &that,
+                           const TCPSegment &seg,
+                           const std::string &desription,
+                           bool check = true) {
+            DUMMY_CODE(that, seg, desription, check);
+#ifdef DEBUG
+            std::cerr << "\n" << color_1(desription) << "\n";
+            std::cerr << (color_2("Flag") + " : ") << (seg.header().syn ? "S" : "") << (seg.header().fin ? "F" : "")
+                      << (seg.header().ack ? "A" : "") << (seg.header().rst ? "R" : "") << "\n"
+                      << (color_2("Sequnce Number") + " : ") << (seg.header().seqno.raw_value()) << "\n"
+                      << (color_2("Acknowledgement Number") + " : ") << (seg.header().ackno) << "\n"
+                      << (color_2("Window Size") + " : ") << (seg.header().win) << "\n"
+                      << (color_2("Payload") + " : ") << (seg.payload().size() ? seg.payload().str() : "empty string")
+                      << "\n"
+                      << (color_2("Payload Size") + " : ") << (seg.payload().size()) << "\n"
+                      << (color_2("Sequnce Space") + " : ") << (seg.length_in_sequence_space()) << "\n"
+                      << (color_2("ackno of sender") + " : ") << (that._sender.next_seqno_absolute()) << "\n"
+                      << (color_2("next seqno absolute of sender") + " : ") << (that._sender.next_seqno_absolute())
+                      << "\n";
+            std::cerr << (color_2("Active: ") + ((that._active) ? "Y " : "N"))
+                      << (color_2("  TIME_WAIT: ") + ((that._linger_after_streams_finish) ? "Y\n" : "N\n"));
+            std::cerr << (color_2("Sender State: ")) << that.state().name() << std::endl;
+#endif
+        }
+    };
+
   private:
+    TCPConnectionDebugger _debugger{};
     TCPConfig _cfg;
     TCPReceiver _receiver{_cfg.recv_capacity};
     TCPSender _sender{_cfg.send_capacity, _cfg.rt_timeout, _cfg.fixed_isn};
@@ -20,6 +64,22 @@ class TCPConnection {
     //! for 10 * _cfg.rt_timeout milliseconds after both streams have ended,
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
+
+    //! Send all segment in sender's output queue, and set the ACK flag and a proper `ackno`
+    void send_segments_in_sender_queue();
+    //! TCP Conn inner state
+    //! TCP connection in active state means that it is other than CLOSED state
+    //! the init state is LISTENING
+    bool _active{true};
+
+    //! Once TCP connection receive a new segment, it will be reset to 0.
+    //! Otherwise, It is a monotonically increasing value in `tick` function
+    size_t _time_since_last_seg_received_ms{0};
+
+    //! Send a RST packet, or receive a RST packet
+    void send_rst_segment();
+    //! unclear shutdown current TCP Connection immediately
+    void set_rst_state();
 
   public:
     //! \name "Input" interface for the writer
